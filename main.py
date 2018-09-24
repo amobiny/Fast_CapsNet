@@ -27,7 +27,7 @@ def main(_):
             write_spec(args)
             model.train()
         elif args.mode == 'test':
-            model.test(args.reload_step)
+            model.test(args.reload_epoch)
 
 
 if __name__ == '__main__':

@@ -117,10 +117,10 @@ class BaseModel(object):
         self.train_loop()
 
     def train_loop(self):
-        if self.conf.reload_step > 0:
-            self.reload(self.conf.reload_step)
+        if self.conf.reload_epoch > 0:
+            self.reload(self.conf.reload_epoch)
             print('*' * 50)
-            print('----> Continue Training from step #{}'.format(self.conf.reload_step))
+            print('----> Continue Training from step #{}'.format(self.conf.reload_epoch))
             print('*' * 50)
         else:
             print('*' * 50)
@@ -142,13 +142,13 @@ class BaseModel(object):
                                                       self.mean_accuracy_op,
                                                       self.merged_summary], feed_dict=feed_dict)
                     loss, acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-                    self.save_summary(summary, glob_step + self.conf.reload_step, mode='train')
+                    self.save_summary(summary, glob_step + self.conf.reload_epoch * self.num_train_batch, mode='train')
                     print('step: {0:<6}, train_loss= {1:.4f}, train_acc={2:.01%}'.format(train_step, loss, acc))
                 else:
                     self.sess.run([self.train_op, self.mean_loss_op, self.mean_accuracy_op], feed_dict=feed_dict)
-            self.evaluate(glob_step)
+            self.evaluate(glob_step, epoch)
 
-    def evaluate(self, train_step):
+    def evaluate(self, train_step, epoch):
         self.sess.run(tf.local_variables_initializer())
         y_pred = np.zeros((self.data_reader.y_valid.shape[0]))
         for step in range(self.num_val_batch):
@@ -160,11 +160,11 @@ class BaseModel(object):
             y_pred[start:end] = yp
         summary_valid = self.sess.run(self.merged_summary, feed_dict=feed_dict)
         valid_loss, valid_acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-        self.save_summary(summary_valid, train_step + self.conf.reload_step, mode='valid')
+        self.save_summary(summary_valid, train_step + self.conf.reload_epoch * self.num_train_batch, mode='valid')
         if valid_acc > self.best_validation_accuracy:
             self.best_validation_accuracy = valid_acc
             improved_str = '(improved)'
-            self.save(train_step + self.conf.reload_step)
+            self.save(epoch)
         else:
             improved_str = ''
 
@@ -199,14 +199,14 @@ class BaseModel(object):
         print(confusion_matrix(np.argmax(self.data_reader.y_test, axis=1), y_pred))
         print('-' * 50)
 
-    def save(self, step):
-        print('----> Saving the model at step #{0}'.format(step))
+    def save(self, epch):
+        print('----> Saving the model at step #{0}'.format(epch))
         checkpoint_path = os.path.join(self.conf.modeldir + self.conf.run_name, self.conf.model_name)
-        self.saver.save(self.sess, checkpoint_path, global_step=step)
+        self.saver.save(self.sess, checkpoint_path, global_step=epch+1)
 
-    def reload(self, step):
+    def reload(self, epch):
         checkpoint_path = os.path.join(self.conf.modeldir + self.conf.run_name, self.conf.model_name)
-        model_path = checkpoint_path + '-' + str(step)
+        model_path = checkpoint_path + '-' + str(epch)
         if not os.path.exists(model_path + '.meta'):
             print('----> No such checkpoint found', model_path)
             return

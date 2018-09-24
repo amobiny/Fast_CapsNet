@@ -2,10 +2,10 @@ import tensorflow as tf
 
 flags = tf.app.flags
 flags.DEFINE_string('mode', 'train', 'train, train_sequence, test, test_sequence or get_features')
-flags.DEFINE_integer('reload_step', 0, 'model number to load (either for testing or continue training)')
-flags.DEFINE_string('model', 'resnet', 'alexnet, resnet, original_capsule, fast_capsule')
-flags.DEFINE_string('loss_type', 'cross_entropy', 'cross_entropy, spread or margin')
-flags.DEFINE_boolean('add_recon_loss', False, 'To add reconstruction loss')
+flags.DEFINE_integer('reload_epoch', 0, 'model number to load (either for testing or continue training)')
+flags.DEFINE_string('model', 'fast_capsule', 'alexnet, resnet, original_capsule, fast_capsule')
+flags.DEFINE_string('loss_type', 'margin', 'cross_entropy, spread or margin')
+flags.DEFINE_boolean('add_recon_loss', True, 'To add reconstruction loss')
 flags.DEFINE_boolean('L2_reg', False, 'Adds L2-regularization to all the network weights')
 flags.DEFINE_float('lmbda', 5e-04, 'L2-regularization coefficient')
 
@@ -21,7 +21,7 @@ flags.DEFINE_float('lambda_val', 0.5, 'Down-weighting parameter for the absent c
 # For reconstruction loss
 flags.DEFINE_float('alpha', 0.0005, 'Regularization coefficient to scale down the reconstruction loss')
 # For training
-flags.DEFINE_integer('batch_size', 4, 'training batch size')
+flags.DEFINE_integer('batch_size', 32, 'training batch size')
 flags.DEFINE_float('init_lr', 1e-4, 'Initial learning rate')
 flags.DEFINE_float('lr_min', 1e-5, 'Minimum learning rate')
 
