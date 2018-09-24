@@ -4,9 +4,13 @@ import os
 from utils import write_spec
 
 if args.model == 'original_capsule':
-    from Original_CapsNet import OrigCapsNet as Model
-elif args.model == 'vector_capsule':
-    from FastCapsNet import FastCapsNet3D as Model
+    from models.Original_CapsNet import OrigCapsNet as Model
+elif args.model == 'fast_capsule':
+    from models.FastCapsNet import FastCapsNet3D as Model
+elif args.model == 'alexnet':
+    from models.AlexNet import AlexNet3D as Model
+elif args.model == 'resnet':
+    from models.ResNet import ResNet3D as Model
 
 
 def main(_):

@@ -48,33 +48,11 @@ flags.DEFINE_string('logdir', './Results/log_dir/', 'Logs directory')
 flags.DEFINE_string('modeldir', './Results/model_dir/', 'Saved models directory')
 flags.DEFINE_string('model_name', 'model', 'Model file name')
 
-
 # CapsNet architecture
-flags.DEFINE_integer('prim_caps_dim', 8, 'Dimension of the PrimaryCapsules')
-flags.DEFINE_integer('digit_caps_dim', 32, 'Dimension of the DigitCapsules')
+flags.DEFINE_integer('iter_routing', 3, 'Number of dynamic routing iterations')
+flags.DEFINE_integer('prim_caps_dim', 256, 'Dimension of the PrimaryCapsules')
+flags.DEFINE_integer('digit_caps_dim', 16, 'Dimension of the DigitCapsules')
 flags.DEFINE_integer('h1', 512, 'Number of hidden units of the first FC layer of the reconstruction network')
 flags.DEFINE_integer('h2', 1024, 'Number of hidden units of the second FC layer of the reconstruction network')
-
-# Parameters of Conv1_layer
-conv1_params = {"filters": 256,
-                "kernel_size": 9,
-                "strides": 1,
-                "padding": "valid",
-                "activation": tf.nn.relu}
-
-flags.DEFINE_integer('prim_caps_dim', 8, 'Dimension of the PrimaryCapsules')
-flags.DEFINE_integer('digit_caps_dim', 32, 'Dimension of the DigitCapsules')
-
-# Parameters of PrimaryCaps_layer
-caps1_n_maps = 1
-caps1_n_caps = caps1_n_maps * 8 * 8 * 8  # 2048 primary capsules
-caps1_n_dims = 256
-
-# Parameters of Conv2_layer
-conv2_params = {"filters": 256,
-                "kernel_size": 9,
-                "strides": 2,
-                "padding": "valid",
-                "activation": tf.nn.relu}
 
 args = tf.app.flags.FLAGS

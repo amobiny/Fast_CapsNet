@@ -32,7 +32,7 @@ def routing(inputs, b_ij, out_caps_dim):
     """
     # W: [num_caps_in, num_caps_out, len_u_i, len_v_j]
     W = tf.get_variable('W', shape=(1, inputs.shape[1].value, b_ij.shape[2].value, inputs.shape[3].value, out_caps_dim),
-                        dtype=tf.float32, initializer=tf.random_normal_initializer(stddev=args.stddev))
+                        dtype=tf.float32, initializer=tf.random_normal_initializer(stddev=0.01))
 
     inputs = tf.tile(inputs, [1, 1, b_ij.shape[2].value, 1, 1])
     # input => [batch_size, 1152, 10, 8, 1]
@@ -76,3 +76,17 @@ def routing(inputs, b_ij, out_caps_dim):
                 b_ij += u_produce_v
     return tf.squeeze(v_j, axis=1), u_hat
     # [batch_size, 10, 16, 1]
+
+
+def deconv3d(input_, output_shape,
+             k_h=4, k_w=4, k_d=4, d_h=2, d_w=2, d_d=2, stddev=0.02,
+             name="deconv2d"):
+    with tf.variable_scope(name):
+        # filter : [height, width, output_channels, in_channels]
+        w = tf.get_variable('w', [k_h, k_w, k_d, output_shape[-1], input_.get_shape()[-1]],
+                            initializer=tf.random_normal_initializer(stddev=stddev))
+
+        deconv = tf.nn.conv3d_transpose(input_, w, output_shape=output_shape, strides=[1, d_h, d_w, d_d, 1])
+        biases = tf.get_variable('biases', [output_shape[-1]], initializer=tf.constant_initializer(0.0))
+        deconv = tf.reshape(tf.nn.bias_add(deconv, biases), deconv.get_shape())
+        return deconv

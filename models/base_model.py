@@ -3,6 +3,7 @@ import os
 import numpy as np
 from loss_ops import margin_loss, spread_loss, cross_entropy
 from sklearn.metrics import confusion_matrix
+from DataLoader import DataLoader
 
 
 class BaseModel(object):
@@ -41,14 +42,11 @@ class BaseModel(object):
                 self.summary_list.append(tf.summary.scalar('l2_loss', l2_loss))
             if self.conf.add_recon_loss:
                 with tf.variable_scope('Reconstruction_Loss'):
-                    orgin = tf.reshape(self.x, shape=(-1, self.conf.height * self.conf.width * self.conf.channel))
-                    squared = tf.square(self.decoder_output - orgin)
+                    squared = tf.square(self.decoder_output - self.x)
                     self.recon_err = tf.reduce_mean(squared)
-                    self.total_loss = loss + self.conf.alpha * self.conf.width * self.conf.height * self.recon_err
+                    self.total_loss = loss + self.conf.alpha * self.recon_err
                     self.summary_list.append(tf.summary.scalar('reconstruction_loss', self.recon_err))
-                    recon_img = tf.reshape(self.decoder_output,
-                                           shape=(-1, self.conf.height, self.conf.width, self.conf.channel))
-                    self.summary_list.append(tf.summary.image('reconstructed', recon_img))
+                    self.summary_list.append(tf.summary.image('reconstructed', self.decoder_output))
                     self.summary_list.append(tf.summary.image('original', self.x))
             else:
                 self.total_loss = loss
@@ -85,22 +83,7 @@ class BaseModel(object):
                 self.learning_rate = tf.maximum(learning_rate, self.conf.lr_min)
             self.summary_list.append(tf.summary.scalar('learning_rate', self.learning_rate))
             optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
-            """Compute gradient."""
             grads = optimizer.compute_gradients(self.total_loss)
-            # grad_check = [tf.check_numerics(g, message='Gradient NaN Found!') for g, _ in grads if g is not None] \
-            #              + [tf.check_numerics(self.total_loss, message='Loss NaN Found')]
-            """Apply graident."""
-            # with tf.control_dependencies(grad_check):
-            #     update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-            #     with tf.control_dependencies(update_ops):
-            """Add graident summary"""
-            # for grad, var in grads:
-            #     self.summary_list.append(tf.summary.histogram(var.name, grad))
-            if self.conf.grad_clip:
-                """Clip graident."""
-                grads = [(tf.clip_by_value(grad, -10., 10.), var) for grad, var in grads]
-            """NaN to zero graident."""
-            # grads = [(tf.where(tf.is_nan(grad), tf.zeros(grad.shape), grad), var) for grad, var in grads]
             self.train_op = optimizer.apply_gradients(grads, global_step=self.global_step)
         self.sess.run(tf.global_variables_initializer())
         trainable_vars = tf.trainable_variables()
@@ -119,7 +102,6 @@ class BaseModel(object):
         self.merged_summary = tf.summary.merge(summary_list)
 
     def save_summary(self, summary, step, mode):
-        # print('----> Summarizing at step {}'.format(step))
         if mode == 'train':
             self.train_writer.add_summary(summary, step)
         elif mode == 'valid':
@@ -129,14 +111,6 @@ class BaseModel(object):
     def train(self):
         self.sess.run(tf.local_variables_initializer())
         self.best_validation_accuracy = 0
-        if self.conf.data == 'mnist':
-            from DataLoaders.MNISTLoader import DataLoader
-        elif self.conf.data == 'nodule':
-            from DataLoaders.DataLoader import DataLoader
-        elif self.conf.data == 'cifar10':
-            from DataLoaders.CIFARLoader import DataLoader
-        elif self.conf.data == 'apoptosis':
-            from DataLoaders.ApoptosisLoader import DataLoader
         self.data_reader = DataLoader(self.conf)
         self.data_reader.get_data(mode='train')
         self.data_reader.get_data(mode='valid')
@@ -224,14 +198,6 @@ class BaseModel(object):
     def test(self, step_num):
         self.sess.run(tf.local_variables_initializer())
         self.reload(step_num)
-        if self.conf.data == 'mnist':
-            from DataLoaders.MNISTLoader import DataLoader
-        elif self.conf.data == 'nodule':
-            from DataLoaders.DataLoader import DataLoader
-        elif self.conf.data == 'cifar10':
-            from DataLoaders.CIFARLoader import DataLoader
-        elif self.conf.data == 'apoptosis':
-            from DataLoaders.ApoptosisLoader import DataLoader
         self.data_reader = DataLoader(self.conf)
         self.data_reader.get_data(mode='test')
         self.num_test_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='test')
@@ -253,79 +219,6 @@ class BaseModel(object):
         print('test_loss= {0:.4f}, test_acc={1:.01%}'.format(test_loss, test_acc))
         print(confusion_matrix(np.argmax(self.data_reader.y_test, axis=1), y_pred))
         print('-' * 50)
-
-        import matplotlib.pyplot as plt
-
-        imgs_num = [100, 200, 300, 400, 500]
-
-        plt.imshow(self.data_reader.x_test[img_num].reshape(28, 28), cmap='gray')
-        plt.show()
-        plt.figure()
-        plt.imshow(img_recon[img_num].reshape(28, 28), cmap='gray')
-        plt.show()
-
-    def get_features(self, step_num):
-        self.sess.run(tf.local_variables_initializer())
-        self.reload(step_num)
-        from DataLoaders.Sequential_ApoptosisLoader import DataLoader
-        self.data_reader = DataLoader(self.conf)
-        self.data_reader.get_data(mode='train')
-        self.data_reader.get_data(mode='test')
-        self.num_train_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='train')
-        self.num_test_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='test')
-        self.is_train = False
-
-        self.sess.run(tf.local_variables_initializer())
-        y_pred = np.zeros((self.data_reader.y_test.shape[0])*self.conf.max_time)
-        features = np.zeros((self.data_reader.y_test.shape[0]*self.conf.max_time, 512))
-        for step in range(self.num_test_batch):
-            start = step * self.conf.batch_size
-            end = (step + 1) * self.conf.batch_size
-            x_test, y_test = self.data_reader.next_batch(start, end, mode='test')
-            feed_dict = {self.x: x_test, self.y: y_test, self.is_training: False}
-            yp, feats, _, _ = self.sess.run([self.y_pred, self.features, self.mean_loss_op, self.mean_accuracy_op],
-                                     feed_dict=feed_dict)
-            y_pred[start*self.conf.max_time:end*self.conf.max_time] = yp
-            features[start*self.conf.max_time:end*self.conf.max_time] = feats
-        test_features = np.reshape(features, [-1, self.conf.max_time, 512])
-        test_loss, test_acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-        print('-' * 18 + 'Test Completed' + '-' * 18)
-        print('test_loss= {0:.4f}, test_acc={1:.01%}'.format(test_loss, test_acc))
-        y_true = np.reshape(np.argmax(self.data_reader.y_test, axis=-1), [-1])
-        print(confusion_matrix(y_true, y_pred))
-        print('-' * 50)
-
-        self.sess.run(tf.local_variables_initializer())
-        y_pred = np.zeros((self.data_reader.y_train.shape[0])*self.conf.max_time)
-        features = np.zeros((self.data_reader.y_train.shape[0]*self.conf.max_time, 512))
-        for step in range(self.num_test_batch):
-            start = step * self.conf.batch_size
-            end = (step + 1) * self.conf.batch_size
-            x_train, y_train = self.data_reader.next_batch(start, end, mode='train')
-            feed_dict = {self.x: x_train, self.y: y_train, self.is_training: False}
-            yp, feats, _, _ = self.sess.run([self.y_pred, self.features, self.mean_loss_op, self.mean_accuracy_op],
-                                     feed_dict=feed_dict)
-            y_pred[start*self.conf.max_time:end*self.conf.max_time] = yp
-            features[start*self.conf.max_time:end*self.conf.max_time] = feats
-        train_features = np.reshape(features, [-1, self.conf.max_time, 512])
-        train_loss, train_acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-        print('-' * 18 + 'Test Completed' + '-' * 18)
-        print('test_loss= {0:.4f}, test_acc={1:.01%}'.format(train_loss, train_acc))
-        y_true = np.reshape(np.argmax(self.data_reader.y_train, axis=-1), [-1])
-        print(confusion_matrix(y_true, y_pred))
-        print('-' * 50)
-        import h5py
-        data_dir = '/home/cougarnet.uh.edu/amobiny/Desktop/Apoptosis_Project/data/'
-        h5f = h5py.File(data_dir + 'features.h5', 'w')
-        h5f.create_dataset('X_train', data=train_features)
-        h5f.create_dataset('Y_train', data=self.data_reader.y_train)
-        h5f.create_dataset('X_valid', data=test_features)
-        h5f.create_dataset('Y_valid', data=self.data_reader.y_test)
-        h5f.create_dataset('X_test', data=test_features)
-        h5f.create_dataset('Y_test', data=self.data_reader.y_test)
-        h5f.close()
-
-
 
     def save(self, step):
         print('----> Saving the model at step #{0}'.format(step))
