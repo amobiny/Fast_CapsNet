@@ -1,7 +1,7 @@
 import tensorflow as tf
 import os
 import numpy as np
-from loss_ops import margin_loss, spread_loss, cross_entropy
+from models.utils.loss_ops import margin_loss, spread_loss, cross_entropy
 from sklearn.metrics import confusion_matrix
 from DataLoader import DataLoader
 
@@ -46,8 +46,8 @@ class BaseModel(object):
                     self.recon_err = tf.reduce_mean(squared)
                     self.total_loss = loss + self.conf.alpha * self.recon_err
                     self.summary_list.append(tf.summary.scalar('reconstruction_loss', self.recon_err))
-                    self.summary_list.append(tf.summary.image('reconstructed', self.decoder_output))
-                    self.summary_list.append(tf.summary.image('original', self.x))
+                    self.summary_list.append(tf.summary.image('reconstructed', self.decoder_output[:, :, :, 16, :]))
+                    self.summary_list.append(tf.summary.image('original', self.x[:, :, :, 16, :]))
             else:
                 self.total_loss = loss
             self.mean_loss, self.mean_loss_op = tf.metrics.mean(self.total_loss)
@@ -127,47 +127,26 @@ class BaseModel(object):
             print('----> Start Training')
             print('*' * 50)
         self.num_val_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='valid')
-        if self.conf.epoch_based:
-            self.num_train_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='train')
-            for epoch in range(self.conf.max_epoch):
-                self.data_reader.randomize()
-                for train_step in range(self.num_train_batch):
-                    glob_step = epoch * self.num_train_batch + train_step
-                    start = train_step * self.conf.batch_size
-                    end = (train_step + 1) * self.conf.batch_size
-                    x_batch, y_batch = self.data_reader.next_batch(start, end, mode='train')
-                    feed_dict = {self.x: x_batch, self.y: y_batch, self.is_training: True}
-                    if train_step % self.conf.SUMMARY_FREQ == 0:
-                        _, _, _, summary = self.sess.run([self.train_op,
-                                                          self.mean_loss_op,
-                                                          self.mean_accuracy_op,
-                                                          self.merged_summary], feed_dict=feed_dict)
-                        loss, acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-                        self.save_summary(summary, glob_step + self.conf.reload_step, mode='train')
-                        print('step: {0:<6}, train_loss= {1:.4f}, train_acc={2:.01%}'.format(train_step, loss, acc))
-                    else:
-                        self.sess.run([self.train_op, self.mean_loss_op, self.mean_accuracy_op], feed_dict=feed_dict)
-                self.evaluate(glob_step)
-        else:
+        self.num_train_batch = self.data_reader.count_num_batch(self.conf.batch_size, mode='train')
+        for epoch in range(self.conf.max_epoch):
             self.data_reader.randomize()
-            for train_step in range(1, self.conf.max_step + 1):
-                # print(train_step)
+            for train_step in range(self.num_train_batch):
+                glob_step = epoch * self.num_train_batch + train_step
+                start = train_step * self.conf.batch_size
+                end = (train_step + 1) * self.conf.batch_size
+                x_batch, y_batch = self.data_reader.next_batch(start, end, mode='train')
+                feed_dict = {self.x: x_batch, self.y: y_batch, self.is_training: True}
                 if train_step % self.conf.SUMMARY_FREQ == 0:
-                    x_batch, y_batch = self.data_reader.next_batch()
-                    feed_dict = {self.x: x_batch, self.y: y_batch, self.is_training: True}
                     _, _, _, summary = self.sess.run([self.train_op,
                                                       self.mean_loss_op,
                                                       self.mean_accuracy_op,
                                                       self.merged_summary], feed_dict=feed_dict)
                     loss, acc = self.sess.run([self.mean_loss, self.mean_accuracy])
-                    self.save_summary(summary, train_step + self.conf.reload_step, mode='train')
+                    self.save_summary(summary, glob_step + self.conf.reload_step, mode='train')
                     print('step: {0:<6}, train_loss= {1:.4f}, train_acc={2:.01%}'.format(train_step, loss, acc))
                 else:
-                    x_batch, y_batch = self.data_reader.next_batch()
-                    feed_dict = {self.x: x_batch, self.y: y_batch, self.is_training: True}
                     self.sess.run([self.train_op, self.mean_loss_op, self.mean_accuracy_op], feed_dict=feed_dict)
-                if train_step % self.conf.VAL_FREQ == 0:
-                    self.evaluate(train_step)
+            self.evaluate(glob_step)
 
     def evaluate(self, train_step):
         self.sess.run(tf.local_variables_initializer())
@@ -204,14 +183,14 @@ class BaseModel(object):
         self.is_train = False
         self.sess.run(tf.local_variables_initializer())
         y_pred = np.zeros((self.data_reader.y_test.shape[0]))
-        img_recon = np.zeros((self.data_reader.y_test.shape[0], self.conf.height*self.conf.width))
+        img_recon = np.zeros((self.data_reader.y_test.shape[0], self.conf.height * self.conf.width))
         for step in range(self.num_test_batch):
             start = step * self.conf.batch_size
             end = (step + 1) * self.conf.batch_size
             x_test, y_test = self.data_reader.next_batch(start, end, mode='test')
             feed_dict = {self.x: x_test, self.y: y_test, self.is_training: False}
             yp, _, _, img = self.sess.run([self.y_pred, self.mean_loss_op, self.mean_accuracy_op, self.decoder_output],
-                                     feed_dict=feed_dict)
+                                          feed_dict=feed_dict)
             y_pred[start:end] = yp
             img_recon[start:end] = img
         test_loss, test_acc = self.sess.run([self.mean_loss, self.mean_accuracy])

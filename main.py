@@ -6,11 +6,11 @@ from utils import write_spec
 if args.model == 'original_capsule':
     from models.Original_CapsNet import OrigCapsNet as Model
 elif args.model == 'fast_capsule':
-    from models.FastCapsNet import FastCapsNet3D as Model
+    from models.FastCapsNet_3D import FastCapsNet3D as Model
 elif args.model == 'alexnet':
-    from models.AlexNet import AlexNet3D as Model
+    from models.AlexNet_3D import AlexNet3D as Model
 elif args.model == 'resnet':
-    from models.ResNet import ResNet3D as Model
+    from models.ResNet_3D import ResNet3D as Model
 
 
 def main(_):
@@ -31,6 +31,6 @@ def main(_):
 
 
 if __name__ == '__main__':
-    # configure which gpu or cpu to use
+    # configure which gpu to use
     os.environ['CUDA_VISIBLE_DEVICES'] = '0'
     tf.app.run()

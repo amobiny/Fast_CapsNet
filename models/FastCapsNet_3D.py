@@ -1,6 +1,6 @@
 from base_model import BaseModel
 import tensorflow as tf
-from ops import *
+from models.utils.ops_caps import *
 import numpy as np
 
 
