@@ -1,4 +1,4 @@
-from base_model import BaseModel
+from models.base_model import BaseModel
 import tensorflow as tf
 from models.utils.ops_caps import *
 import numpy as np
@@ -23,7 +23,7 @@ class FastCapsNet3D(BaseModel):
                                          padding='valid', activation=tf.nn.relu, name="conv2")
                 # [batch_size, 8, 8, 8, 256]
                 shape = conv2.get_shape().as_list()
-                num_prim_caps = shape[1] * shape[2] * shape[3] * shape[4] / self.conf.prim_caps_dim
+                num_prim_caps = int(shape[1] * shape[2] * shape[3] * shape[4] / self.conf.prim_caps_dim)
                 caps1_raw = tf.reshape(conv2, (self.conf.batch_size, num_prim_caps,
                                                self.conf.prim_caps_dim, 1), name="caps1_raw")
                 # [batch_size, 8*8*8, 256, 1]
